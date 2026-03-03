@@ -25,23 +25,52 @@ class TradeEvent(Enum):
 
 
 @dataclass
-class Trade:
-    """Represents a trade/fill event"""
+class MakerOrder:
+    order_id: str = ""
+    owner: str = ""
+    maker_address: str = ""
+    matched_amount: float = 0.0
+    price: float = 0.0
+    fee_rate_bps: int = 0
+    asset_id: str = ""
+    outcome: str = ""
+    side: str = ""
 
+@dataclass
+class Trade:
+    """Represents a trade event."""
+
+    # Core fields used across the codebase.
     id: str
-    order_id: str
     market_id: str
     asset_id: str
     side: str
-    price: float
     size: float
-    fee: float
-    timestamp: datetime
+    price: float
+    fee_rate_bps: int
+    timestamp: Any
+
+    # Canonical websocket event fields.
+    event_type: str = ""
+    type: str = "TRADE"
+    taker_order_id: str = ""
+    status: str = ""
+    match_time: str = ""
+    last_update: Any = ""
     outcome: str = ""
+    owner: str = ""
+    trade_owner: str = ""
+    maker_address: str = ""
+    transaction_hash: str = ""
+    bucket_index: int = 0
+    maker_orders: List[MakerOrder] = field(default_factory=list)
+    trader_side: str = ""
+
+    # Backward-compatible aliases used by legacy callsites/tests.
+    order_id: str = ""
     taker: str = ""
     maker: str = ""
-    transaction_hash: str = ""
-
+    raw_event: Dict[str, Any] | None = None
 
 class PolymarketWebSocket(OrderBookWebSocket):
     """
@@ -486,29 +515,64 @@ class PolymarketUserWebSocket:
     def _parse_trade(self, data: dict) -> Optional[Trade]:
         """Parse TRADE message from Polymarket user WebSocket"""
         try:
-            # Parse match_time (unix timestamp in seconds)
-            ts = data.get("match_time", 0)
+            # Parse matchtime (unix timestamp in seconds) - note: no underscore!
+            ts = data.get("matchtime") or data.get("match_time", 0)
             if isinstance(ts, str):
                 ts = int(ts)
-            timestamp = datetime.fromtimestamp(ts) if ts else datetime.now()
 
-            # taker_order_id is the order that got filled
-            order_id = data.get("taker_order_id", "") or data.get("maker_order_id", "")
+            # Parse last_update timestamp
+            last_update = data.get("last_update", ts)
+            if isinstance(last_update, str):
+                last_update = int(last_update)
+
+            # Parse maker_orders into MakerOrder objects
+            maker_orders_raw = data.get("maker_orders", [])
+            maker_orders = []
+            if maker_orders_raw:
+                for mo in maker_orders_raw:
+                    try:
+                        maker_orders.append(MakerOrder(
+                            order_id=mo.get("order_id", ""),
+                            owner=mo.get("owner", ""),
+                            maker_address=mo.get("maker_address", ""),
+                            matched_amount=float(mo.get("matched_amount", 0)),
+                            price=float(mo.get("price", 0)),
+                            fee_rate_bps=int(mo.get("fee_rate_bps", 0)),
+                            asset_id=mo.get("asset_id", ""),
+                            outcome=mo.get("outcome", ""),
+                            side=mo.get("side", "")
+                        ))
+                    except Exception as e:
+                        if self.verbose:
+                            logger.warning(f"Failed to parse maker_order: {e}")
 
             return Trade(
+                event_type=data.get("event_type", ""),
+                type=data.get("type", ""),
                 id=data.get("id", ""),
-                order_id=order_id,
+                taker_order_id=data.get("taker_order_id", ""),
+                order_id=data.get("taker_order_id", ""),
                 market_id=data.get("market", ""),
                 asset_id=data.get("asset_id", ""),
-                side=(data.get("side", "") or "").lower(),
-                price=float(data.get("price", 0)),
+                side=data.get("side", ""),
                 size=float(data.get("size", 0)),
-                fee=float(data.get("fee_rate_bps", 0) or 0),
-                timestamp=timestamp,
+                price=float(data.get("price", 0)),
+                fee_rate_bps=int(data.get("fee_rate_bps", 0)),
+                status=data.get("status", ""),
+                match_time=data.get("matchtime", ""),
+                last_update=data.get("last_update", ""),
                 outcome=data.get("outcome", ""),
+                owner=data.get("owner", ""),
+                trade_owner=data.get("trade_owner", ""),
+                maker_address=data.get("maker_address", ""),
+                transaction_hash=data.get("transaction_hash", ""),
+                bucket_index=int(data.get("bucket_index", 0)),
+                maker_orders=maker_orders,
+                trader_side=data.get("trader_side", ""),
                 taker=data.get("taker_order_id", ""),
                 maker=data.get("maker_order_id", ""),
-                transaction_hash=data.get("transaction_hash", ""),
+                timestamp=data.get("timestamp", ""),
+                raw_event=dict(data),
             )
         except Exception as e:
             if self.verbose:
