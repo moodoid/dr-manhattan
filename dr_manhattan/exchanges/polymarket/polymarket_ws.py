@@ -178,9 +178,50 @@ class PolymarketWebSocket(OrderBookWebSocket):
             return self._parse_book_message(message)
         elif event_type == "price_change":
             return self._parse_price_change_message(message)
+        elif event_type == "tick_size_change":
+            return self._parse_tick_size_change_message(message)
 
         return None
 
+    def _parse_tick_size_change_message(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Parse tick_size_change message.
+    
+        Emitted when the minimum tick size of a market changes, triggered when
+        the book price crosses 0.96 (upward) or 0.04 (downward).
+    
+        Message format:
+        {
+            "event_type": "tick_size_change",
+            "asset_id": "token_id",
+            "market": "condition_id",
+            "old_tick_size": "0.01",
+            "new_tick_size": "0.001",
+            "timestamp": "1234567890000"
+        }
+        """
+        asset_id = message.get("asset_id", "")
+        market_id = message.get("market", asset_id)
+    
+        try:
+            old_tick_size = float(message.get("old_tick_size", 0))
+        except (ValueError, TypeError):
+            old_tick_size = None
+    
+        try:
+            new_tick_size = float(message.get("new_tick_size", 0))
+        except (ValueError, TypeError):
+            new_tick_size = None
+    
+        return {
+            "market_id": market_id,
+            "asset_id": asset_id,
+            "old_tick_size": old_tick_size,
+            "new_tick_size": new_tick_size,
+            "timestamp": message.get("timestamp", 0),
+            "event_type": "tick_size_change",
+        }
+    
     def _parse_book_message(self, message: Dict[str, Any]) -> Dict[str, Any]:
         """
         Parse book message (full orderbook snapshot).
