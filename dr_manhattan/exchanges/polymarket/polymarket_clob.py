@@ -276,6 +276,8 @@ class PolymarketCLOB:
             raise AuthenticationError("CLOB client not initialized. Private key required.")
 
         token_id = params.get("token_id") if params else None
+        post_only = params.get("post_only", False) if params else False
+
         if not token_id:
             raise InvalidOrder("token_id required in params")
 
@@ -297,7 +299,7 @@ class PolymarketCLOB:
             )
 
             signed_order = self._clob_client.create_order(order_args)
-            result = self._clob_client.post_order(signed_order, clob_order_type)
+            result = self._clob_client.post_order(signed_order, clob_order_type, post_only=post_only))
 
             # Parse result
             order_id = result.get("orderID", "") if isinstance(result, dict) else str(result)
