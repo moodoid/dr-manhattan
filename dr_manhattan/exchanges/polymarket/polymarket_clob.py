@@ -299,7 +299,7 @@ class PolymarketCLOB:
             )
 
             signed_order = self._clob_client.create_order(order_args)
-            result = self._clob_client.post_order(signed_order, clob_order_type, post_only=post_only))
+            result = self._clob_client.post_order(signed_order, clob_order_type, post_only=post_only)
 
             # Parse result
             order_id = result.get("orderID", "") if isinstance(result, dict) else str(result)
