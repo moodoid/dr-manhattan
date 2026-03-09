@@ -180,9 +180,63 @@ class PolymarketWebSocket(OrderBookWebSocket):
             return self._parse_price_change_message(message)
         elif event_type == "tick_size_change":
             return self._parse_tick_size_change_message(message)
+        elif event_type == "last_trade_price":
+            return self._parse_last_trade_price_message(message)
 
         return None
 
+    def _parse_last_trade_price_message(self, message: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Parse last_trade_price message.
+    
+        Emitted when a maker and taker order is matched, creating a trade event.
+    
+        Message format:
+        {
+            "event_type": "last_trade_price",
+            "asset_id": "token_id",
+            "market": "condition_id",
+            "price": "0.456",
+            "side": "BUY",
+            "size": "219.217767",
+            "fee_rate_bps": "0",
+            "timestamp": "1750428146322"
+        }
+        """
+        asset_id = message.get("asset_id", "")
+        market_id = message.get("market", asset_id)
+    
+        try:
+            price = float(message.get("price", 0))
+        except (ValueError, TypeError):
+            price = 0.0
+    
+        try:
+            size = float(message.get("size", 0))
+        except (ValueError, TypeError):
+            size = 0.0
+    
+        try:
+            fee_rate_bps = int(message.get("fee_rate_bps", 0))
+        except (ValueError, TypeError):
+            fee_rate_bps = 0
+    
+        try:
+            timestamp = int(message.get("timestamp", 0))
+        except (ValueError, TypeError):
+            timestamp = 0
+    
+        return {
+            "event_type": "last_trade_price",
+            "asset_id": asset_id,
+            "market_id": market_id,
+            "price": price,
+            "side": message.get("side", ""),
+            "size": size,
+            "fee_rate_bps": fee_rate_bps,
+            "timestamp": timestamp,
+        }
+        
     def _parse_tick_size_change_message(self, message: Dict[str, Any]) -> Dict[str, Any]:
         """
         Parse tick_size_change message.
