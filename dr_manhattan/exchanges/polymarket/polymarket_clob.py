@@ -286,6 +286,7 @@ class PolymarketCLOB:
             OrderTimeInForce.GTC: OrderType.GTC,
             OrderTimeInForce.FOK: OrderType.FOK,
             OrderTimeInForce.IOC: OrderType.GTD,  # py_clob_client uses GTD for IOC behavior
+            OrderTimeInForce.FAK: OrderType.FAK,
         }
         clob_order_type = order_type_map.get(time_in_force, OrderType.GTC)
 
