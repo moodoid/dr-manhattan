@@ -22,6 +22,7 @@ class OrderTimeInForce(Enum):
     GTC = "gtc"  # Good-Til-Cancel: remains active until filled or cancelled
     FOK = "fok"  # Fill-Or-Kill: must be filled immediately and completely or cancelled
     IOC = "ioc"  # Immediate-Or-Cancel: fill what's available immediately, cancel rest
+    FAK = "fak"  # Fill-And-Kill: fill what's available immediately, cancel rest
 
 
 @dataclass
