@@ -8,11 +8,106 @@ import requests
 
 from ...base.errors import ExchangeError
 from ...models.market import Market
+from ...models.position import GenericPosition
 from .polymarket_core import PublicTrade
 
 
 class PolymarketData:
     """Data API mixin: public trades, leaderboard, activity, holders, open interest."""
+
+    def fetch_positions(
+        self,
+        wallet_address: Optional[str] = None,
+        market_id: Optional[str] = None,
+        params: Optional[Dict[str, Any]] = None,
+    ) -> List[GenericPosition]:
+        """
+        Fetch current positions for a user from the Data API.
+
+        Args:
+            wallet_address: User wallet address. Falls back to configured exchange wallet.
+            market_id: Optional market filter
+            params: Additional Data API filters
+
+        Returns:
+            List of GenericPosition objects
+        """
+        params = params or {}
+        resolved_wallet = (
+            wallet_address
+            or params.get("wallet_address")
+            or params.get("user")
+            or getattr(self, "funder", None)
+            or getattr(self, "_address", None)
+        )
+        if not resolved_wallet:
+            raise ValueError("Wallet address is required to fetch positions.")
+
+        resolved_market_id = market_id or params.get("market_id")
+        market_filter = params.get("market")
+        if resolved_market_id and not market_filter:
+            try:
+                market_filter = self._resolve_condition_id(self.fetch_market(resolved_market_id))
+            except Exception:
+                market_filter = resolved_market_id
+
+        total_limit = int(params.get("limit", 100) or 100)
+        if total_limit <= 0:
+            return []
+
+        initial_offset = int(params.get("offset", 0) or 0)
+        if initial_offset < 0 or initial_offset > 10000:
+            raise ValueError("offset must be between 0 and 10000")
+
+        default_page_size = 500
+        page_size = min(default_page_size, total_limit)
+
+        base_params: Dict[str, Any] = {
+            "user": resolved_wallet,
+            "sizeThreshold": params.get("sizeThreshold", 1),
+            "sortBy": params.get("sortBy", "TOKENS"),
+            "sortDirection": params.get("sortDirection", "DESC"),
+        }
+        if market_filter:
+            base_params["market"] = market_filter
+        if "eventId" in params and params["eventId"] is not None:
+            base_params["eventId"] = params["eventId"]
+        if "redeemable" in params and params["redeemable"] is not None:
+            base_params["redeemable"] = params["redeemable"]
+        if "mergeable" in params and params["mergeable"] is not None:
+            base_params["mergeable"] = params["mergeable"]
+        if params.get("title"):
+            base_params["title"] = params["title"]
+
+        @self._retry_on_failure
+        def _fetch_page(offset_: int, limit_: int) -> List[Dict[str, Any]]:
+            resp = requests.get(
+                f"{self.DATA_API_URL}/positions",
+                params={
+                    **base_params,
+                    "limit": limit_,
+                    "offset": offset_,
+                },
+                timeout=self.timeout,
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            if not isinstance(data, list):
+                raise ExchangeError("Data-API /positions response must be a list.")
+            return data
+
+        raw_positions: List[Dict[str, Any]] = self._collect_paginated(
+            _fetch_page,
+            total_limit=total_limit,
+            initial_offset=initial_offset,
+            page_size=page_size,
+        )
+
+        return [
+            self._parse_generic_position(position)
+            for position in raw_positions[:total_limit]
+            if float(position.get("size", 0) or 0) > 0
+        ]
 
     def fetch_public_trades(
         self,
@@ -365,6 +460,37 @@ class PolymarketData:
             return data if isinstance(data, list) else []
 
         return _fetch()
+
+    def _parse_generic_position(self, data: Dict[str, Any]) -> GenericPosition:
+        """Parse Polymarket Data API position into GenericPosition."""
+        return GenericPosition(
+            proxy_wallet=str(data.get("proxyWallet", "") or ""),
+            asset=str(data.get("asset", "") or ""),
+            condition_id=str(data.get("conditionId", "") or ""),
+            size=float(data.get("size", 0) or 0),
+            average_price=float(data.get("avgPrice", data.get("average_price", 0)) or 0),
+            initial_value=float(data.get("initialValue", 0) or 0),
+            current_value=float(data.get("currentValue", 0) or 0),
+            cash_pnl=float(data.get("cashPnl", 0) or 0),
+            percent_pnl=float(data.get("percentPnl", 0) or 0),
+            total_bought=float(data.get("totalBought", 0) or 0),
+            realized_pnl=float(data.get("realizedPnl", 0) or 0),
+            percent_realized_pnl=float(data.get("percentRealizedPnl", 0) or 0),
+            current_price=float(data.get("curPrice", data.get("current_price", 0)) or 0),
+            redeemable=bool(data.get("redeemable", False)),
+            mergable=bool(data.get("mergeable", False)),
+            title=str(data.get("title", "") or ""),
+            slug=str(data.get("slug", "") or ""),
+            icon=str(data.get("icon", "") or ""),
+            event_id=str(data.get("eventId", "") or ""),
+            event_slug=str(data.get("eventSlug", "") or ""),
+            outcome=str(data.get("outcome", "") or ""),
+            outcome_index=int(data.get("outcomeIndex", 0) or 0),
+            opposition_outcome=str(data.get("oppositeOutcome", "") or ""),
+            opposition_asset=str(data.get("oppositeAsset", "") or ""),
+            end_date=str(data.get("endDate", "") or ""),
+            negative_risk=bool(data.get("negativeRisk", False)),
+        )
 
     def fetch_portfolio_value(self, address: str) -> Dict:
         """

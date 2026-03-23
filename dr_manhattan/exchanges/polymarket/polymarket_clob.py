@@ -407,30 +407,6 @@ class PolymarketCLOB:
                 traceback.print_exc()
             return []
 
-    def fetch_positions(
-        self, market_id: Optional[str] = None, params: Optional[Dict[str, Any]] = None
-    ) -> list[Position]:
-        """
-        Fetch current positions from Polymarket.
-
-        Note: On Polymarket, positions are represented by conditional token balances.
-        This method queries token balances for the specified market.
-        Since positions require market-specific token data, we can't query positions
-        without a market context. Returns empty list if no market_id is provided.
-        """
-        if not self._clob_client:
-            raise AuthenticationError("CLOB client not initialized. Private key required.")
-
-        # Positions require market context on Polymarket
-        # Without market_id, we can't determine which tokens to query
-        if not market_id:
-            return []
-
-        # For now, return empty positions list
-        # Positions will be queried on-demand when we have the market object with token IDs
-        # This avoids the chicken-and-egg problem of needing to fetch the market just to get positions
-        return []
-
     def fetch_positions_for_market(self, market: Market) -> list[Position]:
         """
         Fetch positions for a specific market object.
