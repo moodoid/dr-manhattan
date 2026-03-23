@@ -4,7 +4,6 @@ import logging
 import threading
 import time
 from dataclasses import dataclass, field
-from datetime import datetime
 from enum import Enum
 from typing import Any, Callable, Dict, List, Optional
 
@@ -71,6 +70,41 @@ class Trade:
     taker: str = ""
     maker: str = ""
     raw_event: Dict[str, Any] | None = None
+
+
+@dataclass
+class OrderEvent:
+    """Represents an order event from the user WebSocket."""
+
+    id: str
+    market_id: str
+    asset_id: str
+    side: str
+    price: float
+    original_size: float
+    size_matched: float
+    status: str
+
+    event_type: str = "order"
+    type: str = ""
+    owner: str = ""
+    order_owner: str = ""
+    outcome: str = ""
+    created_at: Any = ""
+    expiration: Any = ""
+    order_type: str = ""
+    maker_address: str = ""
+    timestamp: Any = ""
+    associate_trades: Any = None
+
+    order_id: str = ""
+    market: str = ""
+    raw_event: Dict[str, Any] | None = None
+
+    @property
+    def remaining_size(self) -> float:
+        return max(self.original_size - self.size_matched, 0.0)
+
 
 class PolymarketWebSocket(OrderBookWebSocket):
     """
@@ -188,9 +222,9 @@ class PolymarketWebSocket(OrderBookWebSocket):
     def _parse_last_trade_price_message(self, message: Dict[str, Any]) -> Dict[str, Any]:
         """
         Parse last_trade_price message.
-    
+
         Emitted when a maker and taker order is matched, creating a trade event.
-    
+
         Message format:
         {
             "event_type": "last_trade_price",
@@ -205,27 +239,27 @@ class PolymarketWebSocket(OrderBookWebSocket):
         """
         asset_id = message.get("asset_id", "")
         market_id = message.get("market", asset_id)
-    
+
         try:
             price = float(message.get("price", 0))
         except (ValueError, TypeError):
             price = 0.0
-    
+
         try:
             size = float(message.get("size", 0))
         except (ValueError, TypeError):
             size = 0.0
-    
+
         try:
             fee_rate_bps = int(message.get("fee_rate_bps", 0))
         except (ValueError, TypeError):
             fee_rate_bps = 0
-    
+
         try:
             timestamp = int(message.get("timestamp", 0))
         except (ValueError, TypeError):
             timestamp = 0
-    
+
         return {
             "event_type": "last_trade_price",
             "asset_id": asset_id,
@@ -236,14 +270,14 @@ class PolymarketWebSocket(OrderBookWebSocket):
             "fee_rate_bps": fee_rate_bps,
             "timestamp": timestamp,
         }
-        
+
     def _parse_tick_size_change_message(self, message: Dict[str, Any]) -> Dict[str, Any]:
         """
         Parse tick_size_change message.
-    
+
         Emitted when the minimum tick size of a market changes, triggered when
         the book price crosses 0.96 (upward) or 0.04 (downward).
-    
+
         Message format:
         {
             "event_type": "tick_size_change",
@@ -256,17 +290,17 @@ class PolymarketWebSocket(OrderBookWebSocket):
         """
         asset_id = message.get("asset_id", "")
         market_id = message.get("market", asset_id)
-    
+
         try:
             old_tick_size = float(message.get("old_tick_size", 0))
         except (ValueError, TypeError):
             old_tick_size = None
-    
+
         try:
             new_tick_size = float(message.get("new_tick_size", 0))
         except (ValueError, TypeError):
             new_tick_size = None
-    
+
         return {
             "market_id": market_id,
             "asset_id": asset_id,
@@ -275,7 +309,7 @@ class PolymarketWebSocket(OrderBookWebSocket):
             "timestamp": message.get("timestamp", 0),
             "event_type": "tick_size_change",
         }
-    
+
     def _parse_book_message(self, message: Dict[str, Any]) -> Dict[str, Any]:
         """
         Parse book message (full orderbook snapshot).
@@ -489,6 +523,8 @@ class PolymarketWebSocket(OrderBookWebSocket):
 
 
 TradeCallback = Callable[[Trade], None]
+OrderCallback = Callable[[OrderEvent], None]
+MessageCallback = Callable[[Dict[str, Any]], None]
 
 
 class PolymarketUserWebSocket:
@@ -520,12 +556,24 @@ class PolymarketUserWebSocket:
         self._running = False
         self._thread: Optional[threading.Thread] = None
         self._loop: Optional[asyncio.AbstractEventLoop] = None
-        self._callbacks: List[TradeCallback] = []
+        self._trade_callbacks: List[TradeCallback] = []
+        self._order_callbacks: List[OrderCallback] = []
+        self._message_callbacks: List[MessageCallback] = []
         self._connected = False
 
     def on_trade(self, callback: TradeCallback) -> "PolymarketUserWebSocket":
         """Register a callback for trade events"""
-        self._callbacks.append(callback)
+        self._trade_callbacks.append(callback)
+        return self
+
+    def on_order(self, callback: OrderCallback) -> "PolymarketUserWebSocket":
+        """Register a callback for order events."""
+        self._order_callbacks.append(callback)
+        return self
+
+    def on_message(self, callback: MessageCallback) -> "PolymarketUserWebSocket":
+        """Register a callback for raw user-channel message items."""
+        self._message_callbacks.append(callback)
         return self
 
     def _build_auth_message(self) -> dict:
@@ -599,13 +647,22 @@ class PolymarketUserWebSocket:
 
     async def _process_item(self, data: dict):
         """Process a single message item"""
+        self._emit_message(dict(data))
+
         msg_type = (data.get("type", "") or "").upper()
+        event_type = (data.get("event_type", "") or "").lower()
 
         # Polymarket sends "type": "TRADE" for fill notifications
         if msg_type == "TRADE":
             trade = self._parse_trade(data)
             if trade and trade.size > 0:
                 self._emit_trade(trade)
+            return
+
+        if event_type == "order":
+            order = self._parse_order(data)
+            if order:
+                self._emit_order(order)
 
     def _parse_trade(self, data: dict) -> Optional[Trade]:
         """Parse TRADE message from Polymarket user WebSocket"""
@@ -674,14 +731,64 @@ class PolymarketUserWebSocket:
                 logger.warning(f"Failed to parse trade: {e}")
             return None
 
+    def _parse_order(self, data: dict) -> Optional[OrderEvent]:
+        """Parse order message from Polymarket user WebSocket."""
+        try:
+            return OrderEvent(
+                event_type=data.get("event_type", "order"),
+                type=data.get("type", ""),
+                id=data.get("id", ""),
+                order_id=data.get("id", ""),
+                owner=data.get("owner", ""),
+                market_id=data.get("market", ""),
+                market=data.get("market", ""),
+                asset_id=data.get("asset_id", ""),
+                side=data.get("side", ""),
+                order_owner=data.get("order_owner", ""),
+                original_size=float(data.get("original_size", 0)),
+                size_matched=float(data.get("size_matched", 0)),
+                price=float(data.get("price", 0)),
+                associate_trades=data.get("associate_trades"),
+                outcome=data.get("outcome", ""),
+                created_at=data.get("created_at", ""),
+                expiration=data.get("expiration", ""),
+                order_type=data.get("order_type", ""),
+                status=data.get("status", ""),
+                maker_address=data.get("maker_address", ""),
+                timestamp=data.get("timestamp", ""),
+                raw_event=dict(data),
+            )
+        except Exception as e:
+            if self.verbose:
+                logger.warning(f"Failed to parse order update: {e}")
+            return None
+
     def _emit_trade(self, trade: Trade):
         """Emit trade to all callbacks"""
-        for callback in self._callbacks:
+        for callback in self._trade_callbacks:
             try:
                 callback(trade)
             except Exception as e:
                 if self.verbose:
                     logger.warning(f"Trade callback error: {e}")
+
+    def _emit_order(self, order: OrderEvent):
+        """Emit order update to all callbacks."""
+        for callback in self._order_callbacks:
+            try:
+                callback(order)
+            except Exception as e:
+                if self.verbose:
+                    logger.warning(f"Order callback error: {e}")
+
+    def _emit_message(self, data: Dict[str, Any]):
+        """Emit raw message item to all callbacks."""
+        for callback in self._message_callbacks:
+            try:
+                callback(data)
+            except Exception as e:
+                if self.verbose:
+                    logger.warning(f"Message callback error: {e}")
 
     def start(self) -> threading.Thread:
         """Start WebSocket in background thread"""
