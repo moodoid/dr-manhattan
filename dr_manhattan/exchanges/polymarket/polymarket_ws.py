@@ -160,7 +160,13 @@ class PolymarketWebSocket(OrderBookWebSocket):
         self.subscribed_assets.add(asset_id)
 
         # Send subscription message
-        subscribe_message = {"auth": {}, "markets": [], "assets_ids": [asset_id], "type": "market"}
+        subscribe_message = {
+        "auth": {},
+        "markets": [],
+        "assets_ids": list(self.subscribed_assets),
+        "type": "market",
+        "custom_feature_enabled": True,
+    }
 
         await self.ws.send(json.dumps(subscribe_message))
 
@@ -216,8 +222,55 @@ class PolymarketWebSocket(OrderBookWebSocket):
             return self._parse_tick_size_change_message(message)
         elif event_type == "last_trade_price":
             return self._parse_last_trade_price_message(message)
+        elif event_type == "best_bid_ask":
+            return self._parse_best_bid_ask_message(message)
 
         return None
+
+    def _parse_best_bid_ask_message(self, message: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Parse best_bid_ask message.
+    
+        Emitted when the best bid or ask price changes. Requires
+        custom_feature_enabled: true in the subscription message.
+    
+        Message format:
+        {
+            "event_type": "best_bid_ask",
+            "asset_id": "token_id",
+            "market": "condition_id",
+            "best_bid": "0.46",
+            "best_ask": "0.47",
+            "timestamp": "1234567890000"
+        }
+        """
+        asset_id = message.get("asset_id", "")
+        market_id = message.get("market", asset_id)
+    
+        try:
+            best_bid_raw = message.get("best_bid")
+            best_ask_raw = message.get("best_ask")
+            best_bid = float(best_bid_raw) if best_bid_raw else None
+            best_ask = float(best_ask_raw) if best_ask_raw else None
+        except (ValueError, TypeError):
+            return None
+    
+        if best_bid is None and best_ask is None:
+            return None
+    
+        try:
+            timestamp = int(message.get("timestamp", 0))
+        except (ValueError, TypeError):
+            timestamp = 0
+    
+        return {
+            "event_type": "best_bid_ask",
+            "market_id": market_id,
+            "asset_id": asset_id,
+            "best_bid": best_bid,
+            "best_ask": best_ask,
+            "timestamp": timestamp,
+        }
 
     def _parse_last_trade_price_message(self, message: Dict[str, Any]) -> Dict[str, Any]:
         """
