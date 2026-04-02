@@ -924,12 +924,135 @@ class PolymarketGamma:
     # New Gamma API methods
     # =========================================================================
 
+    @staticmethod
+    def _build_event_query_params(
+        *,
+        slug: str | None = None,
+        id: str | None = None,
+        tag_id: int | str | None = None,
+        active: bool | None = None,
+        closed: bool | None = None,
+        archived: bool | None = None,
+        start_date_min: datetime | None = None,
+        start_date_max: datetime | None = None,
+        end_date_min: datetime | None = None,
+        end_date_max: datetime | None = None,
+        extra_params: Dict[str, Any] | None = None,
+    ) -> Dict[str, Any]:
+        def _dt(value: datetime | None) -> str | None:
+            return value.isoformat() if isinstance(value, datetime) else None
+
+        params: Dict[str, Any] = {}
+
+        if slug is not None:
+            params["slug"] = slug
+        if id is not None:
+            params["id"] = id
+        if tag_id is not None:
+            params["tag_id"] = tag_id
+        if active is not None:
+            params["active"] = active
+        if closed is not None:
+            params["closed"] = closed
+        if archived is not None:
+            params["archived"] = archived
+
+        if value := _dt(start_date_min):
+            params["start_date_min"] = value
+        if value := _dt(start_date_max):
+            params["start_date_max"] = value
+        if value := _dt(end_date_min):
+            params["end_date_min"] = value
+        if value := _dt(end_date_max):
+            params["end_date_max"] = value
+
+        if extra_params:
+            params.update(extra_params)
+
+        return params
+
+    def search_events(
+        self,
+        *,
+        limit: int = 500,
+        offset: int = 0,
+        slug: str | None = None,
+        id: str | None = None,
+        tag_id: int | str | None = None,
+        active: bool | None = None,
+        closed: bool | None = None,
+        archived: bool | None = None,
+        start_date_min: datetime | None = None,
+        start_date_max: datetime | None = None,
+        end_date_min: datetime | None = None,
+        end_date_max: datetime | None = None,
+        extra_params: Dict[str, Any] | None = None,
+        log: bool = False,
+    ) -> List[Dict]:
+        total_limit = int(limit)
+        if total_limit <= 0:
+            return []
+
+        initial_offset = max(0, int(offset))
+        default_page_size_events = 500
+        page_size = min(default_page_size_events, total_limit)
+
+        gamma_params = self._build_event_query_params(
+            slug=slug,
+            id=id,
+            tag_id=tag_id,
+            active=active,
+            closed=closed,
+            archived=archived,
+            start_date_min=start_date_min,
+            start_date_max=start_date_max,
+            end_date_min=end_date_min,
+            end_date_max=end_date_max,
+            extra_params=extra_params,
+        )
+
+        @self._retry_on_failure
+        def _fetch_page(offset_: int, limit_: int) -> List[Dict]:
+            params = {
+                **gamma_params,
+                "limit": limit_,
+                "offset": offset_,
+            }
+            resp = requests.get(
+                f"{self.BASE_URL}/events",
+                params=params,
+                timeout=self.timeout,
+            )
+            resp.raise_for_status()
+            raw = resp.json()
+            if not isinstance(raw, list):
+                raise ExchangeError("Gamma /events response must be a list.")
+            return raw
+
+        return self._collect_paginated(
+            _fetch_page,
+            total_limit=total_limit,
+            initial_offset=initial_offset,
+            page_size=page_size,
+            dedup_key=lambda event: event["id"],
+            log=log,
+        )
+
     def fetch_events(
         self,
         limit: int = 100,
         offset: int = 0,
         slug: Optional[str] = None,
         id: Optional[str] = None,
+        tag_id: int | str | None = None,
+        active: bool | None = None,
+        closed: bool | None = None,
+        archived: bool | None = None,
+        start_date_min: datetime | None = None,
+        start_date_max: datetime | None = None,
+        end_date_min: datetime | None = None,
+        end_date_max: datetime | None = None,
+        extra_params: Dict[str, Any] | None = None,
     ) -> List[Dict]:
         """
         Fetch events from the Gamma API.
@@ -939,6 +1062,15 @@ class PolymarketGamma:
             offset: Pagination offset
             slug: Filter by event slug
             id: Filter by event ID
+            tag_id: Filter by tag ID
+            active: Filter by active state
+            closed: Filter by closed state
+            archived: Filter by archived state
+            start_date_min: Filter events starting on or after this datetime
+            start_date_max: Filter events starting on or before this datetime
+            end_date_min: Filter events ending on or after this datetime
+            end_date_max: Filter events ending on or before this datetime
+            extra_params: Additional raw Gamma query params
 
         Returns:
             List of event dictionaries
@@ -946,11 +1078,21 @@ class PolymarketGamma:
 
         @self._retry_on_failure
         def _fetch():
-            params: Dict[str, Any] = {"limit": limit, "offset": offset}
-            if slug:
-                params["slug"] = slug
-            if id:
-                params["id"] = id
+            params = self._build_event_query_params(
+                slug=slug,
+                id=id,
+                tag_id=tag_id,
+                active=active,
+                closed=closed,
+                archived=archived,
+                start_date_min=start_date_min,
+                start_date_max=start_date_max,
+                end_date_min=end_date_min,
+                end_date_max=end_date_max,
+                extra_params=extra_params,
+            )
+            params["limit"] = limit
+            params["offset"] = offset
             resp = requests.get(f"{self.BASE_URL}/events", params=params, timeout=self.timeout)
             resp.raise_for_status()
             data = resp.json()
