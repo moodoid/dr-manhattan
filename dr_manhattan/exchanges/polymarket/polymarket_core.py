@@ -65,7 +65,7 @@ class PolymarketCore:
     """Common infrastructure mixin: constants, init, HTTP, parsing helpers."""
 
     BASE_URL = "https://gamma-api.polymarket.com"
-    CLOB_URL = "https://clob.polymarket.com"
+    CLOB_URL = "https://clob-v2.polymarket.com"
     PRICES_HISTORY_URL = f"{CLOB_URL}/prices-history"
     DATA_API_URL = "https://data-api.polymarket.com"
     SUPPORTED_INTERVALS: Sequence[str] = ("1m", "1h", "6h", "1d", "1w", "max")
