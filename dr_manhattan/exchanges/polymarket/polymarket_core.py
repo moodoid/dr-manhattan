@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Any, Callable, Dict, List, Optional, Sequence
 
 import requests
-from py_clob_client.client import ClobClient
+from py_clob_client_v2.client import ClobClient
 
 from ...base.errors import (
     AuthenticationError,

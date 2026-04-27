@@ -15,7 +15,6 @@ dependencies = [
     "python-socketio[asyncio_client]>=5.11.0",
     "python-dotenv>=1.0.0",
     "eth-account>=0.11.0",
-    "py-clob-client>=0.28.0",
     "opinion-clob-sdk>=0.4.3",
     "pandas>=2.0.0",
     "boto3>=1.42.14",
@@ -25,6 +24,7 @@ dependencies = [
     "predict-sdk>=0.0.8",
     "cryptography>=42.0.0",
     "scikit-learn>=1.8.0",
+    "py-clob-client-v2>=1.0.0",
 ]
 
 [project.urls]

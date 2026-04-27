@@ -14,8 +14,8 @@ import os
 from datetime import datetime
 from typing import Any, Dict, Optional
 
-from py_clob_client.client import ClobClient
-from py_clob_client.clob_types import AssetType, BalanceAllowanceParams, OrderArgs, OrderType
+from py_clob_client_v2.client import ClobClient
+from py_clob_client_v2.clob_types import AssetType, BalanceAllowanceParams, OrderArgs, OrderType
 
 from ...base.errors import AuthenticationError, ExchangeError, InvalidOrder
 from ...models.order import Order, OrderSide, OrderStatus, OrderTimeInForce

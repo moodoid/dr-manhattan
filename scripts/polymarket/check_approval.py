@@ -4,8 +4,8 @@ import os
 from pathlib import Path
 
 from dotenv import load_dotenv
-from py_clob_client.client import ClobClient
-from py_clob_client.clob_types import BalanceAllowanceParams
+from py_clob_client_v2.client import ClobClient
+from py_clob_client_v2.clob_types import BalanceAllowanceParams
 
 # Load .env from project root
 # Works when running: uv run scripts/polymarket/check_approval.py

@@ -13,8 +13,8 @@ from datetime import datetime
 from typing import Any, Dict, Optional
 
 from py_builder_signing_sdk.config import BuilderApiKeyCreds, BuilderConfig
-from py_clob_client.client import ClobClient
-from py_clob_client.clob_types import AssetType, BalanceAllowanceParams, OrderArgs, OrderType
+from py_clob_client_v2.client import ClobClient
+from py_clob_client_v2.clob_types import AssetType, BalanceAllowanceParams, OrderArgs, OrderType
 
 from ...base.errors import AuthenticationError, InvalidOrder
 from ...models.order import Order, OrderSide, OrderStatus, OrderTimeInForce
@@ -122,7 +122,7 @@ class PolymarketBuilder(Polymarket):
         if not token_id:
             raise InvalidOrder("token_id required in params")
 
-        # Map our OrderTimeInForce to py_clob_client OrderType
+        # Map our OrderTimeInForce to py_clob_client_v2 OrderType
         order_type_map = {
             OrderTimeInForce.GTC: OrderType.GTC,
             OrderTimeInForce.FOK: OrderType.FOK,

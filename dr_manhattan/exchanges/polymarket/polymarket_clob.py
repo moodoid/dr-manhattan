@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Literal, Optional
 
 import pandas as pd
 import requests
-from py_clob_client.clob_types import AssetType, BalanceAllowanceParams, OrderArgs, OrderType
+from py_clob_client_v2.clob_types import AssetType, BalanceAllowanceParams, OrderArgs, OrderType
 
 from ...base.errors import (
     AuthenticationError,
@@ -281,11 +281,11 @@ class PolymarketCLOB:
         if not token_id:
             raise InvalidOrder("token_id required in params")
 
-        # Map our OrderTimeInForce to py_clob_client OrderType
+        # Map our OrderTimeInForce to py_clob_client_v2 OrderType
         order_type_map = {
             OrderTimeInForce.GTC: OrderType.GTC,
             OrderTimeInForce.FOK: OrderType.FOK,
-            OrderTimeInForce.IOC: OrderType.GTD,  # py_clob_client uses GTD for IOC behavior
+            OrderTimeInForce.IOC: OrderType.GTD,  # py_clob_client_v2 uses GTD for IOC behavior
             OrderTimeInForce.FAK: OrderType.FAK,
         }
         clob_order_type = order_type_map.get(time_in_force, OrderType.GTC)
@@ -300,7 +300,9 @@ class PolymarketCLOB:
             )
 
             signed_order = self._clob_client.create_order(order_args)
-            result = self._clob_client.post_order(signed_order, clob_order_type, post_only=post_only)
+            result = self._clob_client.post_order(
+                signed_order, clob_order_type, post_only=post_only
+            )
 
             # Parse result
             order_id = result.get("orderID", "") if isinstance(result, dict) else str(result)
