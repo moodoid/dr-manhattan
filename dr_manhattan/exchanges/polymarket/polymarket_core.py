@@ -190,7 +190,7 @@ class PolymarketCore:
             )
 
             # Derive and set API credentials for L2 authentication
-            api_creds = self._clob_client.create_or_derive_api_creds()
+            api_creds = self._clob_client.create_or_derive_api_key()
             if not api_creds:
                 raise AuthenticationError("Failed to derive API credentials")
 

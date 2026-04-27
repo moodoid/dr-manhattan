@@ -43,7 +43,7 @@ try:
     )
 
     # Get API credentials
-    api_creds = client.create_or_derive_api_creds()
+    api_creds = client.create_or_derive_api_key()
     client.set_api_creds(api_creds)
 
     # Get address
