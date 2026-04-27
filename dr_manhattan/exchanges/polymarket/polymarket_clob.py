@@ -8,7 +8,13 @@ from typing import Any, Dict, List, Literal, Optional
 
 import pandas as pd
 import requests
-from py_clob_client_v2.clob_types import AssetType, BalanceAllowanceParams, OrderArgs, OrderType
+from py_clob_client_v2.clob_types import (
+    AssetType,
+    BalanceAllowanceParams,
+    OrderArgs,
+    OrderType,
+    OrderPayload,
+)
 
 from ...base.errors import (
     AuthenticationError,
@@ -337,7 +343,7 @@ class PolymarketCLOB:
             raise AuthenticationError("CLOB client not initialized. Private key required.")
 
         try:
-            result = self._clob_client.cancel(order_id)
+            result = self._clob_client.cancel_order(OrderPayload(orderID=order_id))
             if isinstance(result, dict):
                 return self._parse_order(result)
             return Order(
