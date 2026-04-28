@@ -6,7 +6,7 @@
 - **Exchange Name**: Polymarket
 - **Type**: Prediction Market
 - **Base Class**: [Exchange](../../dr_manhattan/base/exchange.py)
-- **CLOB API**: `https://clob-v2.polymarket.com/`
+- **CLOB API**: `https://clob.polymarket.com/`
 - **Data API**: `https://data-api.polymarket.com/`
 - **Gamma API**: `https://gamma-api.polymarket.com/`
 - **WebSocket API**: `wss://ws-subscriptions-clob.polymarket.com/ws/`
@@ -102,7 +102,7 @@ exchange.describe()
 Polymarket provides multiple specialized APIs for different use cases:
 
 ### CLOB API (Central Limit Order Book)
-- **Base URL**: `https://clob-v2.polymarket.com/`
+- **Base URL**: `https://clob.polymarket.com/`
 - **Purpose**: Order book operations, trading, and order management
 - **Key Endpoints**:
   - `/orderbook` - Get orderbook for a token
@@ -430,7 +430,7 @@ Polymarket CLOB API supports multiple order types:
 
 The CLOB (Central Limit Order Book) API handles all trading operations.
 
-**Base URL:** `https://clob-v2.polymarket.com/`
+**Base URL:** `https://clob.polymarket.com/`
 
 #### Key Trading Endpoints
 

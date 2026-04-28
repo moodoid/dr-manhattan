@@ -5,7 +5,7 @@ from py_clob_client_v2.client import ClobClient
 
 load_dotenv()
 
-host: str = "https://clob-v2.polymarket.com"
+host: str = "https://clob.polymarket.com"
 key: str = os.getenv("POLYMARKET_PRIVATE_KEY")  # This is your Private Key.
 chain_id: int = 137  # No need to adjust this
 POLYMARKET_PROXY_ADDRESS: str = os.getenv(

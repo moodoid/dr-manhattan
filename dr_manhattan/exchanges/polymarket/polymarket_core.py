@@ -65,7 +65,7 @@ class PolymarketCore:
     """Common infrastructure mixin: constants, init, HTTP, parsing helpers."""
 
     BASE_URL = "https://gamma-api.polymarket.com"
-    CLOB_URL = "https://clob-v2.polymarket.com"
+    CLOB_URL = "https://clob.polymarket.com"
     PRICES_HISTORY_URL = f"{CLOB_URL}/prices-history"
     DATA_API_URL = "https://data-api.polymarket.com"
     SUPPORTED_INTERVALS: Sequence[str] = ("1m", "1h", "6h", "1d", "1w", "max")
@@ -190,7 +190,13 @@ class PolymarketCore:
             )
 
             # Derive and set API credentials for L2 authentication
-            api_creds = self._clob_client.create_or_derive_api_key()
+            try:
+                # First try to derive existing key
+                api_creds = self._clob_client.derive_api_key()
+            except Exception:
+                # Only try create if no existing key
+                api_creds = self._clob_client.create_api_key()
+
             if not api_creds:
                 raise AuthenticationError("Failed to derive API credentials")
 

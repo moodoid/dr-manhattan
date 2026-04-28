@@ -35,6 +35,7 @@ class MakerOrder:
     outcome: str = ""
     side: str = ""
 
+
 @dataclass
 class Trade:
     """Represents a trade event."""
@@ -161,12 +162,12 @@ class PolymarketWebSocket(OrderBookWebSocket):
 
         # Send subscription message
         subscribe_message = {
-        "auth": {},
-        "markets": [],
-        "assets_ids": list(self.subscribed_assets),
-        "type": "market",
-        "custom_feature_enabled": True,
-    }
+            "auth": {},
+            "markets": [],
+            "assets_ids": list(self.subscribed_assets),
+            "type": "market",
+            "custom_feature_enabled": True,
+        }
 
         await self.ws.send(json.dumps(subscribe_message))
 
@@ -230,10 +231,10 @@ class PolymarketWebSocket(OrderBookWebSocket):
     def _parse_best_bid_ask_message(self, message: Dict[str, Any]) -> Optional[Dict[str, Any]]:
         """
         Parse best_bid_ask message.
-    
+
         Emitted when the best bid or ask price changes. Requires
         custom_feature_enabled: true in the subscription message.
-    
+
         Message format:
         {
             "event_type": "best_bid_ask",
@@ -246,7 +247,7 @@ class PolymarketWebSocket(OrderBookWebSocket):
         """
         asset_id = message.get("asset_id", "")
         market_id = message.get("market", asset_id)
-    
+
         try:
             best_bid_raw = message.get("best_bid")
             best_ask_raw = message.get("best_ask")
@@ -254,15 +255,15 @@ class PolymarketWebSocket(OrderBookWebSocket):
             best_ask = float(best_ask_raw) if best_ask_raw else None
         except (ValueError, TypeError):
             return None
-    
+
         if best_bid is None and best_ask is None:
             return None
-    
+
         try:
             timestamp = int(message.get("timestamp", 0))
         except (ValueError, TypeError):
             timestamp = 0
-    
+
         return {
             "event_type": "best_bid_ask",
             "market_id": market_id,
@@ -736,17 +737,19 @@ class PolymarketUserWebSocket:
             if maker_orders_raw:
                 for mo in maker_orders_raw:
                     try:
-                        maker_orders.append(MakerOrder(
-                            order_id=mo.get("order_id", ""),
-                            owner=mo.get("owner", ""),
-                            maker_address=mo.get("maker_address", ""),
-                            matched_amount=float(mo.get("matched_amount", 0)),
-                            price=float(mo.get("price", 0)),
-                            fee_rate_bps=int(mo.get("fee_rate_bps", 0)),
-                            asset_id=mo.get("asset_id", ""),
-                            outcome=mo.get("outcome", ""),
-                            side=mo.get("side", "")
-                        ))
+                        maker_orders.append(
+                            MakerOrder(
+                                order_id=mo.get("order_id", ""),
+                                owner=mo.get("owner", ""),
+                                maker_address=mo.get("maker_address", ""),
+                                matched_amount=float(mo.get("matched_amount", 0)),
+                                price=float(mo.get("price", 0)),
+                                fee_rate_bps=0,  # fee_rate_bps provided as empty string since v2 migration
+                                asset_id=mo.get("asset_id", ""),
+                                outcome=mo.get("outcome", ""),
+                                side=mo.get("side", ""),
+                            )
+                        )
                     except Exception as e:
                         if self.verbose:
                             logger.warning(f"Failed to parse maker_order: {e}")

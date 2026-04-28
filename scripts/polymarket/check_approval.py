@@ -35,7 +35,7 @@ print("=" * 80)
 try:
     # Initialize client
     client = ClobClient(
-        host="https://clob-v2.polymarket.com",
+        host="https://clob.polymarket.com",
         key=PRIVATE_KEY,
         chain_id=137,
         signature_type=2,
